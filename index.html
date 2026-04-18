@@ -2,98 +2,151 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inženýrský Network Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Inženýrský Network Monitor - Tomáš Kudělka</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg: #050505;
-            --card: #111111;
+            --card: #0f172a;
             --ping-clr: #ff0055;
             --down-clr: #00f2ff;
             --up-clr: #b2ff00;
+            --text: #f8fafc;
+        }
+
+        /* Vynucení orientace na šířku přes CSS pro mobilní prohlížeč */
+        @media screen and (orientation: portrait) {
+            body {
+                transform: rotate(90deg);
+                transform-origin: left top;
+                width: 100vh;
+                height: 100vw;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                left: 100%;
+            }
         }
 
         body {
             margin: 0;
-            background-color: var(--bg);
-            color: white;
-            font-family: 'Consolas', monospace;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
             padding: 10px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Consolas', 'Courier New', monospace;
+            display: flex;
+            flex-direction: row; /* Rozložení vedle sebe pro režim na šířku */
+            gap: 10px;
+            height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
         .chart-section {
             flex: 1;
             background: var(--card);
-            margin-bottom: 8px;
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            border-left: 4px solid #333;
+            border-bottom: 4px solid #334155;
+            min-width: 0; /* Oprava přetečení ve flexu */
         }
 
         .info {
             display: flex;
-            justify-content: space-between;
-            font-size: 0.8rem;
-            margin-bottom: 5px;
-            text-transform: uppercase;
+            flex-direction: column;
+            margin-bottom: 10px;
         }
 
-        .value { font-size: 1.2rem; font-weight: bold; }
-        
-        canvas { flex-grow: 1 !important; max-height: 85% !important; }
+        .label {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
-        #ping-sec { border-left-color: var(--ping-clr); }
-        #down-sec { border-left-color: var(--down-clr); }
-        #up-sec { border-left-color: var(--up-clr); }
+        .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 4px 0;
+        }
+
+        canvas {
+            flex-grow: 1 !important;
+            width: 100% !important;
+            max-height: 70% !important;
+        }
+
+        #ping-sec { border-bottom-color: var(--ping-clr); }
+        #down-sec { border-bottom-color: var(--down-clr); }
+        #up-sec { border-bottom-color: var(--up-clr); }
+
+        /* Skrytí systémových lišt při přidání na plochu */
+        meta[name="mobile-web-app-capable"] { content: "yes"; }
     </style>
 </head>
 <body>
 
     <div class="chart-section" id="ping-sec">
-        <div class="info"><span>Latency / Ping</span><span class="value" id="v-ping">0 ms</span></div>
+        <div class="info">
+            <span class="label">Latency / Ping</span>
+            <span class="value" id="v-ping" style="color: var(--ping-clr)">0 ms</span>
+        </div>
         <canvas id="c-ping"></canvas>
     </div>
 
     <div class="chart-section" id="down-sec">
-        <div class="info"><span>Download Rate</span><span class="value" id="v-down">0 Mbps</span></div>
+        <div class="info">
+            <span class="label">Download</span>
+            <span class="value" id="v-down" style="color: var(--down-clr)">0 Mbps</span>
+        </div>
         <canvas id="c-down"></canvas>
     </div>
 
     <div class="chart-section" id="up-sec">
-        <div class="info"><span>Upload Rate</span><span class="value" id="v-up">0 Mbps</span></div>
+        <div class="info">
+            <span class="label">Upload</span>
+            <span class="value" id="v-up" style="color: var(--up-clr)">0 Mbps</span>
+        </div>
         <canvas id="c-up"></canvas>
     </div>
 
     <script>
+        // Společné nastavení pro všechny grafy (striktně rovné čáry)
         const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false, // Vypnutí animací pro "rovné" okamžité překreslování
-            elements: { line: { tension: 0 } }, // Striktně rovné čáry
+            animation: false,
+            elements: {
+                line: {
+                    tension: 0, // 0 = žádné zaoblení, čistě lomená čára
+                    borderWidth: 2
+                },
+                point: { radius: 0 } // Skrytí bodů pro čistý technický vzhled
+            },
             scales: {
                 x: { display: false },
-                y: { grid: { color: '#222' }, ticks: { display: false } }
+                y: { 
+                    grid: { color: '#1e293b' },
+                    ticks: { display: false } 
+                }
             },
             plugins: { legend: { display: false } }
         };
 
         function createChart(id, color) {
-            return new Chart(document.getElementById(id), {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: Array(40).fill(''),
+                    labels: Array(50).fill(''),
                     datasets: [{
                         borderColor: color,
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        data: Array(40).fill(0)
+                        backgroundColor: color + '11', // Velmi jemné pozadí
+                        fill: true,
+                        data: Array(50).fill(0)
                     }]
                 },
                 options: commonOptions
@@ -104,8 +157,8 @@
         const chartDown = createChart('c-down', '#00f2ff');
         const chartUp = createChart('c-up', '#b2ff00');
 
-        async function update() {
-            // Měření pingu
+        async function updateData() {
+            // Reálný test latence
             const start = Date.now();
             let ping;
             try {
@@ -113,25 +166,34 @@
                 ping = Date.now() - start;
             } catch { ping = 0; }
 
-            // Simulace/Získání rychlostí
-            const down = navigator.connection ? (navigator.connection.downlink * (0.9 + Math.random() * 0.2)).toFixed(1) : (20 + Math.random() * 5).toFixed(1);
-            const up = (down * 0.3 + Math.random() * 2).toFixed(1);
+            // Získání rychlosti z prohlížeče nebo simulace
+            const down = navigator.connection ? 
+                (navigator.connection.downlink * (0.85 + Math.random() * 0.3)).toFixed(1) : 
+                (Math.random() * 20 + 30).toFixed(1);
+            
+            const up = (down * 0.25 + Math.random() * 3).toFixed(1);
 
-            // Update hodnot a grafů
-            const updateChart = (chart, val, elId, unit) => {
+            const pushData = (chart, val, elId, unit) => {
                 document.getElementById(elId).textContent = val + ' ' + unit;
                 chart.data.datasets[0].data.shift();
                 chart.data.datasets[0].data.push(val);
-                chart.update('none'); // Update bez animace pro inženýrský look
+                chart.update('none');
             };
 
-            updateChart(chartPing, ping, 'v-ping', 'ms');
-            updateChart(chartDown, down, 'v-down', 'Mbps');
-            updateChart(chartUp, up, 'v-up', 'Mbps');
+            pushData(chartPing, ping, 'v-ping', 'ms');
+            pushData(chartDown, down, 'v-down', 'Mbps');
+            pushData(chartUp, up, 'v-up', 'Mbps');
         }
 
-        setInterval(update, 1000);
-        update();
+        // Interval aktualizace 1 vteřina
+        setInterval(updateData, 1000);
+        updateData();
+
+        // Pokus o zamknutí orientace (funguje po instalaci na plochu)
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
     </script>
 </body>
 </html>
+
